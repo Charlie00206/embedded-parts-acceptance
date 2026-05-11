@@ -506,6 +506,12 @@
 
     // 生成全部文档并下载（移除“至少一条记录”限制）
     async function generateAll() {
+      // 显示生成中的提示（避免用户感觉卡死）
+      const tipEl = document.querySelector('.tip');
+      const originalTip = tipEl.textContent;
+      tipEl.textContent = '正在生成验收单，请稍候…';
+      tipEl.style.color = '#2563eb';
+
       try {
         // 如果待生成列表有内容则使用列表，否则使用当前表单数据生成单个验收单
         const dataList = recordList.length > 0 ? recordList : [collectFormData()];
@@ -516,11 +522,36 @@
         }
         const finalBlob = await mergeDocxBlobs(blobs);
         const safeName = (dataList[0].project || '验收单').replace(/[\\/:*?"<>|]/g, '_');
-        saveAs(finalBlob, `埋件验收单_${safeName}_${new Date().toISOString().slice(0,10)}.docx`);
+        const fileName = `埋件验收单_${safeName}_${new Date().toISOString().slice(0,10)}.docx`;
+
+        // 通用下载方法：创建对象URL并模拟点击（不再用 saveAs）
+        const url = URL.createObjectURL(finalBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // 若仍在微信内，提示用户在浏览器中打开
+        if (/MicroMessenger/i.test(navigator.userAgent)) {
+          setTimeout(() => {
+            tipEl.innerHTML = '若未自动下载，请点击右上角「…」选择“在浏览器中打开”下载';
+            tipEl.style.color = '#dc2626';
+          }, 1000);
+        } else {
+          tipEl.textContent = originalTip;
+          tipEl.style.color = '#666';
+        }
+
         saveTempData();
       } catch (error) {
         console.error(error);
         alert('生成失败：' + error.message);
+        tipEl.textContent = originalTip;
+        tipEl.style.color = '#666';
       }
     }
 
